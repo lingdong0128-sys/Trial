@@ -1,0 +1,23 @@
+{
+  "providers": [
+    {
+      "id": "qwen",
+      "name": "阿里云百炼平台",
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode",
+      "api_key": "sk-5ab797bf0f9d4114a2e510799aedff9f",
+      "models": [
+        "qwen-plus",
+        "kimi-k2.5"
+      ]
+    },
+    {
+      "id": "deepseek",
+      "name": "深度求索",
+      "api_base": "https://api.deepseek.com",
+      "api_key": "sk-a103dc79608a4c7da413ae729aab00f4",
+      "models": [
+        "deepseek-chat"
+      ]
+    }
+  ]
+}

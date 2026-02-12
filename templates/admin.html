@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}后台配置 - Trial{% endblock %}
+{% block extra_css %}
+.admin-wrap { max-width: 680px; margin: 0 auto; padding: 1.5rem; }
+.admin-wrap h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.admin-wrap .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+.block { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: box-shadow 0.2s ease; }
+.block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.block-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.block-header input.provider-name { flex: 1; font-size: 1rem; font-weight: 600; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+.btn-del-provider { padding: 0.4rem 0.75rem; font-size: 0.8rem; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; }
+.btn-del-provider:hover { background: #fecaca; }
+.block label { display: block; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+.block input.full { width: 100%; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); margin-bottom: 0.5rem; }
+.hint { font-size: 0.8rem; color: var(--muted); margin-top: -0.25rem; margin-bottom: 0.5rem; }
+.model-list { margin-top: 0.5rem; }
+.model-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.model-row input { flex: 1; margin-bottom: 0; }
+.model-row .btn-del { padding: 0.35rem 0.6rem; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.model-row .btn-del:hover { background: #fecaca; }
+.btn-add-model { padding: 0.35rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 0.875rem; color: var(--muted); margin-top: 0.25rem; transition: background 0.2s, color 0.2s; }
+.btn-add-model:hover { background: var(--border); color: var(--text); }
+.add-provider-wrap { margin-top: 1rem; }
+.btn-add-provider { padding: 0.6rem 1rem; background: var(--card); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; font-size: 0.9rem; color: var(--muted); width: 100%; transition: border-color 0.2s, color 0.2s; }
+.btn-add-provider:hover { border-color: var(--accent); color: var(--accent); }
+.save-btn { padding: 0.6rem 1.25rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+.save-btn:hover { background: var(--accent-hover); }
+.status { margin-top: 0.5rem; font-size: 0.875rem; color: var(--muted); }
+{% endblock %}
+{% block content %}
+<div class="admin-wrap">
+    <h1>API 配置</h1>
+    <p class="sub">可修改服务商名称，添加或删除服务商；每个服务商下可自由添加/删除模型。API Key 留空则不修改已保存的值。</p>
+
+    <div id="providerBlocks">
+        {% for p in providers %}
+        <div class="block" data-provider-id="{{ p.id }}">
+            <div class="block-header">
+                <input type="text" class="provider-name" value="{{ p.name }}" placeholder="服务商名称" data-field="name">
+                <input type="hidden" class="provider-id" value="{{ p.id }}" data-field="id">
+                <button type="button" class="btn-del-provider">删除服务商</button>
+            </div>
+            <label>API Base URL</label>
+            <input type="text" class="full" data-field="api_base" value="{{ p.api_base or '' }}" placeholder="https://...">
+            <label>API Key</label>
+            <input type="password" class="full" data-field="api_key" value="{{ p.api_key or '' }}" placeholder="留空则不修改已保存的 Key">
+            <p class="hint">模型列表（可添加/删除）</p>
+            <div class="model-list" data-field="models">
+                {% for m in p.models or [] %}
+                <div class="model-row"><input type="text" value="{{ m }}" placeholder="模型名"><button type="button" class="btn-del">删除</button></div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn-add-model">+ 添加模型</button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="add-provider-wrap">
+        <button type="button" class="btn-add-provider" id="addProvider">+ 添加服务商</button>
+    </div>
+
+    <div style="margin-top: 1.25rem;">
+        <button class="save-btn" id="save">保存配置</button>
+        <div class="status" id="status"></div>
+    </div>
+</div>
+<script>
+(function() {
+    const statusEl = document.getElementById('status');
+    const container = document.getElementById('providerBlocks');
+
+    function genId() { return 'provider_' + Math.random().toString(36).slice(2, 10); }
+
+    function collectProvider(block) {
+        const id = (block.querySelector('.provider-id') || {}).value || genId();
+        const name = (block.querySelector('.provider-name') || {}).value || id;
+        const api_base = (block.querySelector('input[data-field="api_base"]') || {}).value || '';
+        const api_key = (block.querySelector('input[data-field="api_key"]') || {}).value || '';
+        const modelRows = block.querySelectorAll('.model-list .model-row');
+        const models = Array.from(modelRows).map(function(row) {
+            const v = (row.querySelector('input') || {}).value.trim();
+            return v || null;
+        }).filter(Boolean);
+        return { id: id, name: name.trim(), api_base: api_base.trim(), api_key: api_key.trim(), models: models.length ? models : ['default'] };
+    }
+
+    function collectAll() {
+        return Array.from(container.querySelectorAll('.block')).map(collectProvider);
+    }
+
+    document.getElementById('addProvider').addEventListener('click', function() {
+        const id = genId();
+        const block = document.createElement('div');
+        block.className = 'block';
+        block.dataset.providerId = id;
+        block.innerHTML = '<div class="block-header">' +
+            '<input type="text" class="provider-name" placeholder="服务商名称" data-field="name">' +
+            '<input type="hidden" class="provider-id" value="' + id + '" data-field="id">' +
+            '<button type="button" class="btn-del-provider">删除服务商</button></div>' +
+            '<label>API Base URL</label><input type="text" class="full" data-field="api_base" placeholder="https://...">' +
+            '<label>API Key</label><input type="password" class="full" data-field="api_key" placeholder="留空则不修改">' +
+            '<p class="hint">模型列表（可添加/删除）</p><div class="model-list" data-field="models"><div class="model-row"><input type="text" placeholder="模型名"><button type="button" class="btn-del">删除</button></div></div>' +
+            '<button type="button" class="btn-add-model">+ 添加模型</button>';
+        container.appendChild(block);
+        block.querySelector('.btn-del-provider').addEventListener('click', function() { block.remove(); });
+    });
+
+    container.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-del-provider')) e.target.closest('.block').remove();
+        if (e.target.classList.contains('btn-del')) e.target.closest('.model-row').remove();
+        if (e.target.classList.contains('btn-add-model')) {
+            const block = e.target.closest('.block');
+            const list = block.querySelector('.model-list');
+            const row = document.createElement('div');
+            row.className = 'model-row';
+            row.innerHTML = '<input type="text" placeholder="模型名"><button type="button" class="btn-del">删除</button>';
+            row.querySelector('.btn-del').addEventListener('click', function() { row.remove(); });
+            list.appendChild(row);
+        }
+    });
+
+    document.getElementById('save').addEventListener('click', function() {
+        const providers = collectAll();
+        if (providers.length === 0) { statusEl.textContent = '请至少保留一个服务商'; return; }
+        fetch('/admin/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providers: providers })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            statusEl.textContent = data.ok ? '已保存（配置已持久化）' : (data.error || '保存失败');
+        })
+        .catch(function() { statusEl.textContent = '请求失败'; });
+    });
+})();
+</script>
+{% endblock %}

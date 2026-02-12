@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trial{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('favicon') }}" type="image/jpeg">
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --muted: #64748b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        a { color: var(--accent); text-decoration: none; }
+        .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.5rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .nav-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.9rem; color: var(--text); background: transparent; border: 1px solid transparent; cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease; text-decoration: none; }
+        .nav-btn:hover { background: var(--bg); border-color: var(--border); }
+        .nav-btn.active { background: #dbeafe; color: var(--accent); border-color: #93c5fd; }
+        .nav-spacer { flex: 1; }
+        .nav .logout { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.875rem; color: var(--muted); background: transparent; border: 1px solid transparent; cursor: pointer; transition: background 0.2s, color 0.2s; text-decoration: none; }
+        .nav .logout:hover { background: #fef2f2; color: #dc2626; }
+        main { animation: fadeIn 0.25s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        {% block extra_css %}{% endblock %}
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block nav %}
+    {% if session.get('logged_in') %}
+    <nav class="nav">
+        <a href="{{ url_for('chat.index') }}" class="nav-btn {% if request.endpoint == 'chat.index' %}active{% endif %}">对话</a>
+        <a href="{{ url_for('admin.index') }}" class="nav-btn {% if request.endpoint == 'admin.index' %}active{% endif %}">后台配置</a>
+        <span class="nav-spacer"></span>
+        <a class="logout" href="{{ url_for('auth.logout') }}">退出</a>
+    </nav>
+    {% endif %}
+    {% endblock %}
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
