@@ -1,11 +1,11 @@
-{% extends "base.html" %}
-{% block title %}后台配置 - Trial{% endblock %}
+{% extends "settings_base.html" %}
+{% block title %}API信息 - Trial{% endblock %}
 {% block extra_css %}
-.admin-wrap { max-width: 680px; margin: 0 auto; padding: 1.5rem; }
+{{ super() }}
+.admin-wrap { max-width: 680px; margin: 0; padding: 0; }
 .admin-wrap h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
 .admin-wrap .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
-.block { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: box-shadow 0.2s ease; }
-.block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.block { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
 .block-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .block-header .provider-title { font-size: 1rem; font-weight: 600; color: var(--text); }
 .block-header .model-badge { font-size: 0.8rem; color: var(--muted); background: var(--bg); padding: 0.25rem 0.5rem; border-radius: 6px; }
@@ -13,14 +13,13 @@
 .block input.full { width: 100%; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); margin-bottom: 0.5rem; }
 .block .api-doc { font-size: 0.8rem; margin-bottom: 0.75rem; }
 .block .api-doc a { color: var(--accent); }
-.hint { font-size: 0.8rem; color: var(--muted); margin-top: -0.25rem; margin-bottom: 0.5rem; }
-.save-btn { padding: 0.6rem 1.25rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+.save-btn { padding: 0.6rem 1.25rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
 .save-btn:hover { background: var(--accent-hover); }
 .status { margin-top: 0.5rem; font-size: 0.875rem; color: var(--muted); }
 {% endblock %}
-{% block content %}
+{% block settings_content %}
 <div class="admin-wrap">
-    <h1>API 配置</h1>
+    <h1>API 信息</h1>
     <p class="sub">服务商与模型已固定，仅可配置 API 地址与 Key。API Key 留空则不修改已保存的值。</p>
 
     <div id="providerBlocks">

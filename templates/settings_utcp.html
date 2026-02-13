@@ -1,0 +1,91 @@
+{% extends "settings_base.html" %}
+{% block title %}UTCP 控制台 - Trial{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.utcp-wrap { max-width: 820px; margin: 0; padding: 0; }
+.utcp-wrap h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.utcp-wrap .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+.utcp-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.utcp-card h2 { font-size: 1rem; margin: 0 0 0.5rem 0; color: var(--text); }
+.utcp-card .desc { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.75rem; }
+.utcp-card .bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.utcp-card .bar input { padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.875rem; width: 8rem; }
+.utcp-card .bar .btn-call { padding: 0.45rem 1rem; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; }
+.utcp-card .bar .btn-call:hover { background: #1d4ed8; }
+.utcp-card .out { background: #0f172a; color: #e2e8f0; padding: 0.75rem 1rem; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; max-height: 280px; overflow-y: auto; }
+.utcp-card .out.empty { color: var(--muted); }
+.utcp-card .out.err { color: #fca5a5; }
+.utcp-card .loading { color: #94a3b8; }
+{% endblock %}
+{% block settings_content %}
+<div class="utcp-wrap">
+    <h1>UTCP 控制台</h1>
+    <p class="sub">调用 UTCP 接口并查看返回结果。所有请求均发往 <code>/api/utcp/...</code>。</p>
+
+    <div class="utcp-card">
+        <h2>健康检查 <code>GET /api/utcp/health</code></h2>
+        <p class="desc">检查 UTCP 服务是否可用。</p>
+        <div class="bar">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/health" data-method="GET">调用</button>
+        </div>
+        <pre class="out empty" data-target="health">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>日期时间 <code>GET/POST /api/utcp/datetime</code></h2>
+        <p class="desc">获取当前日期、时间、时区、星期、时间戳等。可选 timezone_hours（如 8 表示 UTC+8）。</p>
+        <div class="bar">
+            <input type="text" id="datetime-tz" placeholder="时区小时（可选，如 8）" value="8">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/datetime" data-method="GET" data-query-param="timezone_hours">调用 GET</button>
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/datetime" data-method="POST" data-body-param="timezone_hours">调用 POST</button>
+        </div>
+        <pre class="out empty" data-target="datetime">点击「调用」查看响应</pre>
+    </div>
+</div>
+<script>
+(function() {
+    function findCard(btn) {
+        var card = btn.closest('.utcp-card');
+        return card ? card.querySelector('.out[data-target]') : null;
+    }
+    function getParam(btn) {
+        var param = btn.getAttribute('data-query-param') || btn.getAttribute('data-body-param');
+        if (!param) return null;
+        var card = btn.closest('.utcp-card');
+        var input = card ? card.querySelector('input[id]') : null;
+        return input ? input.value.trim() : null;
+    }
+    function setOut(pre, text, isErr) {
+        pre.textContent = text || '';
+        pre.classList.remove('empty', 'err', 'loading');
+        if (!text) pre.classList.add('empty');
+        else if (isErr) pre.classList.add('err');
+    }
+    document.querySelectorAll('.utcp-card .btn-call').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var pre = findCard(btn);
+            if (!pre) return;
+            var endpoint = btn.getAttribute('data-endpoint');
+            var method = (btn.getAttribute('data-method') || 'GET').toUpperCase();
+            var param = btn.getAttribute('data-query-param') || btn.getAttribute('data-body-param');
+            var paramVal = param ? getParam(btn) : null;
+            var url = endpoint;
+            var options = { method: method, headers: {} };
+            if (method === 'GET' && param && paramVal !== null && paramVal !== '') {
+                url += (url.indexOf('?') >= 0 ? '&' : '?') + encodeURIComponent(param) + '=' + encodeURIComponent(paramVal);
+            }
+            if (method === 'POST') {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = param ? JSON.stringify(paramVal !== null && paramVal !== '' ? { [param]: paramVal } : {}) : '{}';
+            }
+            setOut(pre, '请求中…', false);
+            pre.classList.add('loading');
+            fetch(url, options)
+                .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, status: r.status, json: j }; }); })
+                .then(function(x) { var text = JSON.stringify(x.json, null, 2); setOut(pre, text, !x.ok); })
+                .catch(function(e) { setOut(pre, '请求失败: ' + e.message, true); });
+        });
+    });
+})();
+</script>
+{% endblock %}

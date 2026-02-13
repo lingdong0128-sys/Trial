@@ -36,7 +36,7 @@
     {% if session.get('logged_in') %}
     <nav class="nav">
         <a href="{{ url_for('chat.index') }}" class="nav-btn {% if request.endpoint == 'chat.index' %}active{% endif %}">对话</a>
-        <a href="{{ url_for('admin.index') }}" class="nav-btn {% if request.endpoint == 'admin.index' %}active{% endif %}">后台配置</a>
+        <a href="{{ url_for('settings.config') }}" class="nav-btn {% if request.endpoint and request.endpoint.startswith('settings.') %}active{% endif %}">设置</a>
         <span class="nav-spacer"></span>
         <a class="logout" href="{{ url_for('auth.logout') }}">退出</a>
     </nav>

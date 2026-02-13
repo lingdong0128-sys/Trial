@@ -1,0 +1,60 @@
+{% extends "settings_base.html" %}
+{% block title %}全局配置 - Trial{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.global-wrap { max-width: 560px; margin: 0; padding: 0; }
+.global-wrap h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+.global-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.global-section h2 { font-size: 1rem; margin: 0 0 0.75rem 0; color: var(--text); }
+.global-section .desc { color: var(--muted); font-size: 0.875rem; margin-bottom: 0.75rem; }
+.btn-check { padding: 0.5rem 1rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+.btn-check:hover { background: var(--accent-hover); }
+.btn-check:disabled { opacity: 0.6; cursor: not-allowed; }
+.check-result { margin-top: 0.75rem; font-size: 0.875rem; }
+.check-result .item { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.check-result .item:last-child { border-bottom: none; }
+.check-result .ok { color: #059669; }
+.check-result .err { color: #dc2626; }
+.toggle-row label { font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+.toggle-row input[type="checkbox"] { width: 1.1rem; height: 1.1rem; cursor: pointer; }
+.status-msg { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+{% endblock %}
+{% block settings_content %}
+<div class="global-wrap">
+    <h1>全局配置</h1>
+    <section class="global-section">
+        <h2>API 配置检测</h2>
+        <p class="desc">检测当前已配置的各服务商 API 是否可用。</p>
+        <button type="button" class="btn-check" id="btnCheck">检测 API</button>
+        <div class="check-result" id="checkResult" style="display: none;"></div>
+    </section>
+    <section class="global-section">
+        <h2>是否启用 UTCP 插件</h2>
+        <p class="desc">关闭后，对话页将不展示「启用 UTCP 工具」选项。</p>
+        <label class="toggle-row"><input type="checkbox" id="utcpEnabled" {% if utcp_plugin_enabled %}checked{% endif %}> 启用 UTCP 插件</label>
+        <div class="status-msg" id="utcpStatus"></div>
+    </section>
+</div>
+<script>
+(function() {
+    document.getElementById('btnCheck').addEventListener('click', function() {
+        var btn = this, el = document.getElementById('checkResult');
+        btn.disabled = true; el.style.display = 'block'; el.innerHTML = '检测中…';
+        fetch('/settings/global/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                el.innerHTML = (data.results || []).map(function(x) {
+                    return '<div class="item ' + (x.ok ? 'ok' : 'err') + '">' + (x.label || '') + ': ' + (x.message || '') + '</div>';
+                }).join('') || '无配置项';
+            })
+            .catch(function() { el.innerHTML = '<div class="item err">请求失败</div>'; })
+            .finally(function() { btn.disabled = false; });
+    });
+    document.getElementById('utcpEnabled').addEventListener('change', function() {
+        var st = document.getElementById('utcpStatus');
+        fetch('/settings/global/api/utcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ utcp_plugin_enabled: this.checked }) })
+            .then(function(r) { return r.json(); }).then(function(d) { st.textContent = d.ok ? '已保存' : (d.error || ''); }).catch(function() { st.textContent = '保存失败'; });
+    });
+})();
+</script>
+{% endblock %}

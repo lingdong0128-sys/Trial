@@ -1,13 +1,13 @@
 # Trial Web 应用
 
-基于 Python (Flask) 的 Web 应用，支持多模型对话、后台 API 配置与 UTCP 占位接口。
+基于 Python (Flask) 的 Web 应用，支持多模型对话、后台 API 配置与 UTCP 协议接口。
 
 ## 功能
 
 - **全局登录**：默认账号 `root` / 密码 `itzx`
 - **对话页**：选择 QWEN 或 DeepSeek 模型进行对话，预留后续模型扩展
 - **后台配置**：在「后台配置」页配置 QWEN、DeepSeek 的 API Base、API Key、模型名
-- **UTCP 占位**：`/api/utcp/query`、`/api/utcp/health` 为 UTCP 协议预留端口，内含 `query_application()` 占位方法便于后续接入
+- **UTCP 接口**：`utcp/` 包提供健康检查 `/api/utcp/health`、日期时间 `/api/utcp/datetime` 等工具；Web 端有「UTCP 控制台」页可调用并查看响应
 
 ## 环境
 
@@ -46,8 +46,9 @@ python app.py
 | 模型列表       | GET `/api/models` |
 | 后台配置页     | GET `/admin/`    |
 | 保存配置       | POST `/admin/api/config` |
-| UTCP 查询占位  | GET/POST `/api/utcp/query`，可选 `app_id` |
-| UTCP 健康占位  | GET `/api/utcp/health` |
+| UTCP 健康检查  | GET `/api/utcp/health` |
+| UTCP 日期时间  | GET/POST `/api/utcp/datetime`，可选 `timezone_hours` |
+| UTCP 控制台页  | GET `/utcp` |
 
 ## 配置存储
 

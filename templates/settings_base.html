@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block extra_css %}
+.settings-layout { display: flex; min-height: calc(100vh - 52px); padding-left: 1.5rem; }
+.settings-sidebar { width: 180px; flex-shrink: 0; padding-top: 1rem; }
+.settings-sidebar a { display: block; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.9rem; color: var(--text); text-decoration: none; margin-bottom: 2px; transition: background 0.2s, color 0.2s; }
+.settings-sidebar a:hover { background: var(--bg); color: var(--accent); }
+.settings-sidebar a.active { background: #dbeafe; color: var(--accent); }
+.settings-main { flex: 1; min-width: 0; padding: 1rem 1.5rem 1.5rem 1rem; }
+{% endblock %}
+{% block content %}
+<div class="settings-layout">
+    <nav class="settings-sidebar" aria-label="设置子导航">
+        <a href="{{ url_for('settings.global_config') }}" class="{% if request.endpoint == 'settings.global_config' %}active{% endif %}">全局配置</a>
+        <a href="{{ url_for('settings.config') }}" class="{% if request.endpoint == 'settings.config' %}active{% endif %}">API信息</a>
+        <a href="{{ url_for('settings.utcp') }}" class="{% if request.endpoint == 'settings.utcp' %}active{% endif %}">UTCP 控制台</a>
+        <a href="{{ url_for('settings.about') }}" class="{% if request.endpoint == 'settings.about' %}active{% endif %}">关于我们</a>
+    </nav>
+    <main class="settings-main">
+        {% block settings_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}

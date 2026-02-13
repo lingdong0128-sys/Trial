@@ -19,8 +19,15 @@
 .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .toolbar { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--card); }
 .toolbar label { color: var(--muted); font-size: 0.875rem; }
-.toolbar select { padding: 0.45rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); min-width: 140px; transition: border-color 0.2s; }
+.toolbar select { padding: 0.45rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); min-width: 200px; transition: border-color 0.2s; }
 .toolbar select:focus { outline: none; border-color: var(--accent); }
+.toolbar-options { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.toolbar-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.875rem; color: var(--muted); cursor: pointer; }
+.toolbar-check input { cursor: pointer; }
+.toolbar-btn-toggle { padding: 0.45rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.875rem; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; }
+.toolbar-btn-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.toolbar-btn-toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+.toolbar-btn-toggle.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .messages { flex: 1; overflow-y: auto; padding: 1rem; }
 .msg { margin-bottom: 1rem; display: flex; flex-direction: column; align-items: flex-start; animation: msgIn 0.2s ease; }
 @keyframes msgIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -61,10 +68,11 @@
     </aside>
     <div class="chat-main">
         <div class="toolbar">
-            <label for="provider">服务商</label>
-            <select id="provider"></select>
-            <label for="model">模型</label>
-            <select id="model"></select>
+            <label for="modelOption">模型</label>
+            <select id="modelOption"></select>
+            <span class="toolbar-options" id="toolbarOptions">
+                <button type="button" class="toolbar-btn-toggle" id="btnDeepThinking" style="display: none;">启用深度思考</button>
+            </span>
         </div>
         <div class="messages" id="messages"></div>
         <div class="input-row">
@@ -89,8 +97,8 @@
     const messagesEl = document.getElementById('messages');
     const inputEl = document.getElementById('input');
     const sendBtn = document.getElementById('send');
-    const providerEl = document.getElementById('provider');
-    const modelEl = document.getElementById('model');
+    const modelOptionEl = document.getElementById('modelOption');
+    const btnDeepThinkingEl = document.getElementById('btnDeepThinking');
     const errorEl = document.getElementById('error');
     const conversationListEl = document.getElementById('conversationList');
     const newChatBtn = document.getElementById('newChat');
@@ -118,60 +126,56 @@
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
 
-    function fillProviderOptions() {
-        const curId = providerEl.value;
-        providerEl.innerHTML = '';
-        providers.forEach(function(p) {
+    function fillModelOptions() {
+        const curIdx = modelOptionEl.value === '' ? -1 : parseInt(modelOptionEl.value, 10);
+        modelOptionEl.innerHTML = '';
+        providers.forEach(function(p, i) {
             const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = p.name;
-            if (p.id === curId) opt.selected = true;
-            providerEl.appendChild(opt);
+            opt.value = String(i);
+            opt.textContent = p.label;
+            if (i === curIdx || (curIdx < 0 && i === 0)) opt.selected = true;
+            modelOptionEl.appendChild(opt);
         });
-        if (providers.length && !providerEl.value) providerEl.selectedIndex = 0;
+        updateToolbarOptionsVisibility();
     }
 
-    function updateModelOptions() {
-        const pid = providerEl.value;
-        const p = providers.find(function(x) { return x.id === pid; });
-        const models = (p && p.models && p.models.length) ? p.models : [];
-        const curModel = modelEl.value;
-        modelEl.innerHTML = '';
-        var firstModel = null;
-        models.forEach(function(m) {
-            const opt = document.createElement('option');
-            opt.value = m;
-            opt.textContent = m;
-            if (!firstModel) firstModel = m;
-            if (m === curModel) opt.selected = true;
-            modelEl.appendChild(opt);
-        });
-        if (models.length) {
-            if (!modelEl.value || models.indexOf(modelEl.value) === -1) {
-                modelEl.value = firstModel;
-                modelEl.selectedIndex = 0;
-            }
+    var deepThinkingEnabled = false;
+    function updateToolbarOptionsVisibility() {
+        const idx = parseInt(modelOptionEl.value, 10);
+        const p = providers[idx];
+        if (!p) {
+            btnDeepThinkingEl.style.display = 'none';
+            return;
+        }
+        btnDeepThinkingEl.style.display = p.support_deep_thinking ? 'inline-block' : 'none';
+        if (!p.support_deep_thinking) {
+            deepThinkingEnabled = false;
+            btnDeepThinkingEl.classList.remove('active');
         }
     }
 
-    function refreshProvidersThenUpdateUI() {
+    var utcpPluginEnabled = true;
+    function refreshModelsThenUpdateUI() {
         fetch('/api/models').then(function(r) { return r.json(); }).then(function(data) {
             if (data.providers && data.providers.length) providers = data.providers;
-            fillProviderOptions();
-            updateModelOptions();
+            else if (data.models && data.models.length) providers = data.models;
+            utcpPluginEnabled = data.utcp_plugin_enabled !== false;
+            fillModelOptions();
         }).catch(function() {
-            fillProviderOptions();
-            updateModelOptions();
+            fillModelOptions();
         });
     }
 
-    providerEl.addEventListener('change', function() {
-        updateModelOptions();
+    modelOptionEl.addEventListener('change', updateToolbarOptionsVisibility);
+
+    btnDeepThinkingEl.addEventListener('click', function() {
+        if (!providers[parseInt(modelOptionEl.value, 10)] || !providers[parseInt(modelOptionEl.value, 10)].support_deep_thinking) return;
+        deepThinkingEnabled = !deepThinkingEnabled;
+        btnDeepThinkingEl.classList.toggle('active', deepThinkingEnabled);
     });
 
-    fillProviderOptions();
-    updateModelOptions();
-    refreshProvidersThenUpdateUI();
+    fillModelOptions();
+    refreshModelsThenUpdateUI();
 
     function addMessage(role, content, options) {
         options = options || {};
@@ -186,7 +190,8 @@
         } else {
             bubble.innerHTML = renderMarkdown(content);
         }
-        div.innerHTML = '<div class="role">' + (role === 'user' ? '你' : '助手') + '</div>';
+        const roleLabel = role === 'user' ? '你' : (options.model_label || '助手');
+        div.innerHTML = '<div class="role">' + escapeHtml(roleLabel) + '</div>';
         div.appendChild(bubble);
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -235,8 +240,8 @@
             .then(function(conv) {
                 if (!conv.messages) return;
                 conv.messages.forEach(function(m) {
-                    addMessage(m.role, m.content || '');
-                    messages.push({ role: m.role, content: m.content || '' });
+                    addMessage(m.role, m.content || '', { model_label: m.model_label });
+                    messages.push({ role: m.role, content: m.content || '', model_label: m.model_label });
                 });
                 renderConversationList();
             })
@@ -292,16 +297,15 @@
     renderConversationList();
 
     function getCurrentProviderAndModel() {
-        var pid = providerEl.value;
-        var model = modelEl.value;
-        var p = providers.find(function(x) { return x.id === pid; });
-        var models = (p && p.models) ? p.models : [];
-        if (!model && models.length) {
-            model = models[0];
-            modelEl.value = model;
-            modelEl.selectedIndex = 0;
-        }
-        return { providerId: pid, model: model };
+        var idx = parseInt(modelOptionEl.value, 10);
+        var p = providers[idx];
+        if (!p) return { providerId: '', model: '', useUtcpTools: false, useDeepThinking: false };
+        return {
+            providerId: p.provider_id,
+            model: p.model,
+            useUtcpTools: utcpPluginEnabled && p.support_function_calling,
+            useDeepThinking: p.support_deep_thinking && deepThinkingEnabled
+        };
     }
 
     function sendMessage() {
@@ -311,7 +315,7 @@
         var providerId = sel.providerId;
         var model = sel.model;
         if (!providerId || !model) {
-            showError('请先选择服务商与模型');
+            showError('请先选择模型');
             return;
         }
         messages.push({ role: 'user', content: text });
@@ -320,7 +324,8 @@
         sendBtn.disabled = true;
         showError('');
 
-        var assistantBubble = addMessage('assistant', '', { id: 'streaming-msg' });
+        var currentLabel = (providers[parseInt(modelOptionEl.value, 10)] || {}).label || '助手';
+        var assistantBubble = addMessage('assistant', '', { id: 'streaming-msg', model_label: currentLabel });
         var streamContent = '';
 
         fetch('/api/chat/stream', {
@@ -330,7 +335,9 @@
                 provider_id: providerId,
                 model: model,
                 messages: messages,
-                conversation_id: currentConversationId
+                conversation_id: currentConversationId,
+                use_utcp_tools: sel.useUtcpTools,
+                use_deep_thinking: sel.useDeepThinking
             })
         })
         .then(function(response) {
@@ -366,7 +373,7 @@
             return read();
         })
         .then(function() {
-            messages.push({ role: 'assistant', content: streamContent });
+            messages.push({ role: 'assistant', content: streamContent, model_label: currentLabel });
             var el = document.getElementById('streaming-msg');
             if (el) el.id = '';
             renderConversationList();
