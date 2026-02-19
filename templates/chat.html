@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block title %}对话 - Trial{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+{% endblock %}
+{% block extra_css %}
+.layout { display: flex; height: calc(100vh - 52px); }
+.sidebar { width: 260px; min-width: 220px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 1px 0 4px rgba(0,0,0,0.04); transition: box-shadow 0.2s ease; }
+.sidebar-title { padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
+.sidebar-new { margin: 0.5rem; padding: 0.55rem 0.75rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.875rem; text-align: center; transition: background 0.2s ease, transform 0.15s ease; }
+.sidebar-new:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+.sidebar-item { display: flex; align-items: center; gap: 0.25rem; padding: 0.5rem 0.75rem; border-radius: 8px; cursor: pointer; font-size: 0.875rem; margin-bottom: 2px; transition: background 0.2s ease; }
+.sidebar-item:hover { background: var(--bg); }
+.sidebar-item.active { background: #dbeafe; color: var(--accent); }
+.sidebar-item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-item .btn-del { flex-shrink: 0; padding: 0.2rem 0.4rem; font-size: 0.75rem; background: transparent; border: none; color: var(--muted); cursor: pointer; border-radius: 4px; transition: background 0.2s, color 0.2s; }
+.sidebar-item .btn-del:hover { background: #fecaca; color: #dc2626; }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.toolbar { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--card); }
+.toolbar label { color: var(--muted); font-size: 0.875rem; }
+.toolbar select { padding: 0.45rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); min-width: 140px; transition: border-color 0.2s; }
+.toolbar select:focus { outline: none; border-color: var(--accent); }
+.messages { flex: 1; overflow-y: auto; padding: 1rem; }
+.msg { margin-bottom: 1rem; display: flex; flex-direction: column; align-items: flex-start; animation: msgIn 0.2s ease; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.msg.user { align-items: flex-end; }
+.msg.user .bubble { background: var(--accent); color: white; padding: 0.75rem 1rem; border-radius: 12px 12px 4px 12px; max-width: min(85%, 560px); width: fit-content; }
+.msg.assistant .bubble { background: var(--card); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 12px 12px 12px 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); max-width: min(85%, 560px); width: fit-content; }
+.msg .role { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+.msg.assistant .bubble pre { background: var(--bg); padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-size: 0.875rem; }
+.msg.assistant .bubble code { background: var(--bg); padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.9em; }
+.msg.assistant .bubble pre code { padding: 0; }
+.input-row { padding: 1rem; border-top: 1px solid var(--border); background: var(--card); display: flex; gap: 0.5rem; }
+.input-row input { flex: 1; padding: 0.65rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); transition: border-color 0.2s; }
+.input-row input:focus { outline: none; border-color: var(--accent); }
+.input-row button { padding: 0.65rem 1.25rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s ease; }
+.input-row button:hover:not(:disabled) { background: var(--accent-hover); }
+.input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+.error { color: #dc2626; padding: 0 1rem 0.5rem; font-size: 0.875rem; }
+
+/* 删除确认：背景虚化子页面 */
+.confirm-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s; }
+.confirm-overlay.show { opacity: 1; visibility: visible; }
+.confirm-card { background: var(--card); border-radius: 12px; padding: 1.5rem; max-width: 320px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); transform: scale(0.95); transition: transform 0.2s ease; }
+.confirm-overlay.show .confirm-card { transform: scale(1); }
+.confirm-card .confirm-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 1rem; }
+.confirm-card .confirm-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; }
+.confirm-card .confirm-btn { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.9rem; cursor: pointer; border: none; transition: background 0.2s; }
+.confirm-card .confirm-btn-primary { background: var(--accent); color: white; }
+.confirm-card .confirm-btn-primary:hover { background: var(--accent-hover); }
+.confirm-card .confirm-btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.confirm-card .confirm-btn-secondary:hover { background: var(--border); }
+{% endblock %}
+{% block content %}
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-title">对话</div>
+        <button type="button" class="sidebar-new" id="newChat">+ 新对话</button>
+        <div class="sidebar-list" id="conversationList"></div>
+    </aside>
+    <div class="chat-main">
+        <div class="toolbar">
+            <label for="provider">服务商</label>
+            <select id="provider"></select>
+            <label for="model">模型</label>
+            <select id="model"></select>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="input-row">
+            <input type="text" id="input" placeholder="输入消息...（支持多轮对话记忆）" autocomplete="off">
+            <button type="button" id="send">发送</button>
+        </div>
+        <div class="error" id="error" style="display: none;"></div>
+    </div>
+
+    <div class="confirm-overlay" id="confirmOverlay" aria-hidden="true">
+        <div class="confirm-card" id="confirmCard">
+            <p class="confirm-title" id="confirmTitle">确定删除该对话？</p>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-btn confirm-btn-primary" id="confirmOk">确定</button>
+                <button type="button" class="confirm-btn confirm-btn-secondary" id="confirmCancel">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const providerEl = document.getElementById('provider');
+    const modelEl = document.getElementById('model');
+    const errorEl = document.getElementById('error');
+    const conversationListEl = document.getElementById('conversationList');
+    const newChatBtn = document.getElementById('newChat');
+
+    let providers = {{ providers | tojson }};
+    let currentConversationId = null;
+    let messages = [];
+
+    function showError(msg) {
+        errorEl.textContent = msg || '';
+        errorEl.style.display = msg ? 'block' : 'none';
+    }
+
+    function escapeHtml(s) {
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    function renderMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({ breaks: true });
+            return marked.parse(text || '');
+        }
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
+    function fillProviderOptions() {
+        const curId = providerEl.value;
+        providerEl.innerHTML = '';
+        providers.forEach(function(p) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (p.id === curId) opt.selected = true;
+            providerEl.appendChild(opt);
+        });
+        if (providers.length && !providerEl.value) providerEl.selectedIndex = 0;
+    }
+
+    function updateModelOptions() {
+        const pid = providerEl.value;
+        const p = providers.find(function(x) { return x.id === pid; });
+        const models = (p && p.models && p.models.length) ? p.models : [];
+        const curModel = modelEl.value;
+        modelEl.innerHTML = '';
+        var firstModel = null;
+        models.forEach(function(m) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (!firstModel) firstModel = m;
+            if (m === curModel) opt.selected = true;
+            modelEl.appendChild(opt);
+        });
+        if (models.length) {
+            if (!modelEl.value || models.indexOf(modelEl.value) === -1) {
+                modelEl.value = firstModel;
+                modelEl.selectedIndex = 0;
+            }
+        }
+    }
+
+    function refreshProvidersThenUpdateUI() {
+        fetch('/api/models').then(function(r) { return r.json(); }).then(function(data) {
+            if (data.providers && data.providers.length) providers = data.providers;
+            fillProviderOptions();
+            updateModelOptions();
+        }).catch(function() {
+            fillProviderOptions();
+            updateModelOptions();
+        });
+    }
+
+    providerEl.addEventListener('change', function() {
+        updateModelOptions();
+    });
+
+    fillProviderOptions();
+    updateModelOptions();
+    refreshProvidersThenUpdateUI();
+
+    function addMessage(role, content, options) {
+        options = options || {};
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.dataset.role = role;
+        if (options.id) div.id = options.id;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        if (role === 'user') {
+            bubble.textContent = content;
+        } else {
+            bubble.innerHTML = renderMarkdown(content);
+        }
+        div.innerHTML = '<div class="role">' + (role === 'user' ? '你' : '助手') + '</div>';
+        div.appendChild(bubble);
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return bubble;
+    }
+
+    function renderConversationList() {
+        fetch('/api/conversations')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                conversationListEl.innerHTML = '';
+                (data.conversations || []).forEach(function(c) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'sidebar-item' + (c.id === currentConversationId ? ' active' : '');
+                    wrap.dataset.id = c.id;
+                    const title = document.createElement('span');
+                    title.className = 'sidebar-item-title';
+                    title.textContent = c.title || '新对话';
+                    const btnDel = document.createElement('button');
+                    btnDel.type = 'button';
+                    btnDel.className = 'btn-del';
+                    btnDel.textContent = '删除';
+                    btnDel.setAttribute('aria-label', '删除');
+                    wrap.appendChild(title);
+                    wrap.appendChild(btnDel);
+                    wrap.addEventListener('click', function(ev) {
+                        if (ev.target === btnDel) return;
+                        loadConversation(c.id);
+                    });
+                    btnDel.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        showConfirmDelete(c.id);
+                    });
+                    conversationListEl.appendChild(wrap);
+                });
+            })
+            .catch(function() {});
+    }
+
+    function loadConversation(cid) {
+        currentConversationId = cid;
+        messages = [];
+        messagesEl.innerHTML = '';
+        fetch('/api/conversations/' + encodeURIComponent(cid))
+            .then(function(r) { return r.json(); })
+            .then(function(conv) {
+                if (!conv.messages) return;
+                conv.messages.forEach(function(m) {
+                    addMessage(m.role, m.content || '');
+                    messages.push({ role: m.role, content: m.content || '' });
+                });
+                renderConversationList();
+            })
+            .catch(function() { renderConversationList(); });
+    }
+
+    function startNewChat() {
+        currentConversationId = null;
+        messages = [];
+        messagesEl.innerHTML = '';
+        renderConversationList();
+    }
+
+    var pendingDeleteId = null;
+    var confirmOverlay = document.getElementById('confirmOverlay');
+    var confirmCard = document.getElementById('confirmCard');
+    var confirmOk = document.getElementById('confirmOk');
+    var confirmCancel = document.getElementById('confirmCancel');
+
+    function showConfirmDelete(cid) {
+        pendingDeleteId = cid;
+        confirmOverlay.classList.add('show');
+        confirmOverlay.setAttribute('aria-hidden', 'false');
+    }
+    function hideConfirm() {
+        pendingDeleteId = null;
+        confirmOverlay.classList.remove('show');
+        confirmOverlay.setAttribute('aria-hidden', 'true');
+    }
+    function doConfirmDelete() {
+        if (!pendingDeleteId) return;
+        var cid = pendingDeleteId;
+        hideConfirm();
+        fetch('/api/conversations/' + encodeURIComponent(cid), { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function() {
+                if (currentConversationId === cid) startNewChat();
+                else currentConversationId = null;
+                renderConversationList();
+            });
+    }
+    confirmOk.addEventListener('click', doConfirmDelete);
+    confirmCancel.addEventListener('click', hideConfirm);
+    confirmOverlay.addEventListener('click', function(ev) {
+        if (ev.target === confirmOverlay) hideConfirm();
+    });
+    confirmCard.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    document.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Escape' && confirmOverlay.classList.contains('show')) hideConfirm();
+    });
+
+    newChatBtn.addEventListener('click', startNewChat);
+    renderConversationList();
+
+    function getCurrentProviderAndModel() {
+        var pid = providerEl.value;
+        var model = modelEl.value;
+        var p = providers.find(function(x) { return x.id === pid; });
+        var models = (p && p.models) ? p.models : [];
+        if (!model && models.length) {
+            model = models[0];
+            modelEl.value = model;
+            modelEl.selectedIndex = 0;
+        }
+        return { providerId: pid, model: model };
+    }
+
+    function sendMessage() {
+        const text = (inputEl.value || '').trim();
+        if (!text) return;
+        var sel = getCurrentProviderAndModel();
+        var providerId = sel.providerId;
+        var model = sel.model;
+        if (!providerId || !model) {
+            showError('请先选择服务商与模型');
+            return;
+        }
+        messages.push({ role: 'user', content: text });
+        addMessage('user', text);
+        inputEl.value = '';
+        sendBtn.disabled = true;
+        showError('');
+
+        var assistantBubble = addMessage('assistant', '', { id: 'streaming-msg' });
+        var streamContent = '';
+
+        fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider_id: providerId,
+                model: model,
+                messages: messages,
+                conversation_id: currentConversationId
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) return response.json().then(function(d) { throw new Error(d.error || '请求失败'); });
+            return response.body.getReader();
+        })
+        .then(function(reader) {
+            var decoder = new TextDecoder();
+            var buffer = '';
+            function read() {
+                return reader.read().then(function(result) {
+                    if (result.done) return;
+                    buffer += decoder.decode(result.value, { stream: true });
+                    var lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    lines.forEach(function(line) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                var data = JSON.parse(line.slice(6));
+                                if (data.content !== undefined) {
+                                    streamContent += data.content;
+                                    assistantBubble.innerHTML = renderMarkdown(streamContent);
+                                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                                }
+                                if (data.conversation_id) currentConversationId = data.conversation_id;
+                                if (data.error) showError(data.error);
+                            } catch (e) {}
+                        }
+                    });
+                    return read();
+                });
+            }
+            return read();
+        })
+        .then(function() {
+            messages.push({ role: 'assistant', content: streamContent });
+            var el = document.getElementById('streaming-msg');
+            if (el) el.id = '';
+            renderConversationList();
+        })
+        .catch(function(e) {
+            showError(e.message || '请求失败');
+            var el = document.getElementById('streaming-msg');
+            if (el) el.remove();
+            messages.pop();
+        })
+        .finally(function() {
+            sendBtn.disabled = false;
+        });
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+})();
+</script>
+{% endblock %}
