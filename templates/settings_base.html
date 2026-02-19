@@ -12,6 +12,7 @@
     <nav class="settings-sidebar" aria-label="设置子导航">
         <a href="{{ url_for('settings.global_config') }}" class="{% if request.endpoint == 'settings.global_config' %}active{% endif %}">全局配置</a>
         <a href="{{ url_for('settings.config') }}" class="{% if request.endpoint == 'settings.config' %}active{% endif %}">API信息</a>
+        <a href="{{ url_for('settings.knowledge') }}" class="{% if request.endpoint == 'settings.knowledge' %}active{% endif %}">知识库</a>
         <a href="{{ url_for('settings.utcp') }}" class="{% if request.endpoint == 'settings.utcp' %}active{% endif %}">UTCP 控制台</a>
         <a href="{{ url_for('settings.about') }}" class="{% if request.endpoint == 'settings.about' %}active{% endif %}">关于我们</a>
     </nav>

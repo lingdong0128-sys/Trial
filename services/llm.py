@@ -40,7 +40,8 @@ def _openai_style_chat_sync(api_base: str, api_key: str, model: str, messages: l
         payload["tool_choice"] = "auto"
     if extra_body:
         payload.update(extra_body)
-    r = requests.post(url, json=payload, headers=headers, timeout=120)
+    # 多轮工具调用时请求体与模型推理时间较长，超时设为 300 秒
+    r = requests.post(url, json=payload, headers=headers, timeout=300)
     r.raise_for_status()
     return r.json()
 
@@ -55,7 +56,8 @@ def _openai_style_chat_stream(api_base: str, api_key: str, model: str, messages:
     payload = {"model": model, "messages": messages, "stream": True}
     if extra_body:
         payload.update(extra_body)
-    r = requests.post(url, json=payload, headers=headers, timeout=120, stream=True)
+    # 多轮工具调用时单次请求可能较久，超时设为 300 秒
+    r = requests.post(url, json=payload, headers=headers, timeout=300, stream=True)
     r.raise_for_status()
     for line in r.iter_lines(decode_unicode=True):
         if not line or not line.strip():
@@ -97,11 +99,63 @@ def chat_completion(provider_id: str, model: str, messages: list) -> dict:
     return _openai_style_chat(api_base, api_key, model, messages, stream=False)
 
 
-def chat_completion_with_tools(provider_id: str, model: str, messages: list, max_tool_rounds: int = 20, use_deep_thinking: bool = False) -> str:
+def judge_shell_stuck(provider_id: str, model: str, command: str, stdout: str, stderr: str) -> bool:
+    """
+    根据命令当前输出判断是否已卡住。返回 True 表示应中止（卡住），False 表示可继续执行。
+    用于 run_shell 的周期性检查（如每 1 分钟）。
+    """
+    out = (stdout or "").strip()
+    err = (stderr or "").strip()
+    combined = (out + "\n--- stderr ---\n" + err).strip()
+    if len(combined) > 2500:
+        combined = combined[-2500:]
+    prompt = (
+        "你是一个助手。用户正在服务器上执行一条 shell 命令，命令已运行一段时间，当前已捕获的标准输出和标准错误如下。"
+        "请判断：命令是否看起来已卡住（例如长时间无新输出、死循环、重复报错、明显挂起）？"
+        "还是仍在正常进行（例如安装进度、下载、编译输出、持续有变化）？"
+        "只回复一个词：STOP（判定为卡住需中止）或 CONTINUE（判定为仍在进行）。\n\n"
+        "命令：" + (command or "")[:200] + "\n\n当前输出：\n" + (combined or "(暂无输出)")
+    )
+    try:
+        resp = chat_completion(provider_id, model, [{"role": "user", "content": prompt}])
+        content = (resp.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        return "STOP" in content.upper()
+    except Exception:
+        return False
+
+
+def make_shell_judge_callback(provider_id: str, model: str):
+    """返回供 run_shell 使用的判断回调：(command, stdout, stderr) -> True 表示卡住应中止。"""
+    def callback(command: str, stdout: str, stderr: str) -> bool:
+        return judge_shell_stuck(provider_id, model, command, stdout, stderr)
+    return callback
+
+
+def summarize_conversation_title(provider_id: str, model: str, user_content: str, assistant_content: str) -> str:
+    """调用模型生成对话标题，限制 10 字以内。失败返回空字符串。"""
+    user_preview = (user_content or "")[:500]
+    assistant_preview = (assistant_content or "")[:500]
+    prompt = f"""用10个字以内总结以下对话，只输出总结标题，不要引号、不要换行、不要其他解释。
+
+用户：{user_preview}
+助手：{assistant_preview}"""
+    messages = [{"role": "user", "content": prompt}]
+    try:
+        result = chat_completion(provider_id, model, messages)
+        content = (result.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        title = (content or "").strip().replace("\n", " ").strip()
+        if len(title) > 10:
+            title = title[:10]
+        return title
+    except Exception:
+        return ""
+
+
+def chat_completion_with_tools(provider_id: str, model: str, messages: list, max_tool_rounds: int = 50, use_deep_thinking: bool = False) -> str:
     """
     带 UTCP 工具调用的对话（自动化工作流）：向模型传入工具定义，若模型返回 tool_calls 则执行并继续请求，
     直到模型返回纯文本或达到最大轮数。返回最终助手回复内容。
-    max_tool_rounds 默认 20，支持多步自动化。若服务商 API 不支持 tools 则回退为普通对话。
+    max_tool_rounds 默认 50，支持多步自动化。若服务商 API 不支持 tools 则回退为普通对话。
     use_deep_thinking：是否启用深度思考（如 DeepSeek 的 reasoning 模式）。
     """
     from utcp.tools_def import get_openai_tools
@@ -115,6 +169,7 @@ def chat_completion_with_tools(provider_id: str, model: str, messages: list, max
     if use_deep_thinking:
         # DeepSeek 官方文档：thinking 参数为 {"type": "enabled"}
         extra_body = {"thinking": {"type": "enabled"}}
+    shell_judge = make_shell_judge_callback(provider_id, model)
 
     for _ in range(max_tool_rounds):
         try:
@@ -143,6 +198,12 @@ def chat_completion_with_tools(provider_id: str, model: str, messages: list, max
         # 追加助手消息（含 tool_calls）
         current_messages.append(msg)
         # 执行每个 tool_call 并追加 tool 消息
+        cfg = _get_config()
+        safe_mode = bool(cfg.get("safe_mode", False))
+        project_root = current_app.config.get("PROJECT_ROOT")
+        project_root = str(project_root) if project_root else None
+        uploads_dir = current_app.config.get("UPLOADS_DIR")
+        uploads_dir = str(uploads_dir) if uploads_dir else None
         for tc in tool_calls:
             tid = tc.get("id") or ""
             fn = tc.get("function") or {}
@@ -151,7 +212,11 @@ def chat_completion_with_tools(provider_id: str, model: str, messages: list, max
                 args = json.loads(fn.get("arguments") or "{}")
             except json.JSONDecodeError:
                 args = {}
-            result = execute_tool(name, args)
+            result = execute_tool(
+                name, args,
+                llm_judge_callback=shell_judge if name == "run_shell" else None,
+                safe_mode=safe_mode, project_root=project_root, uploads_dir=uploads_dir,
+            )
             current_messages.append({"role": "tool", "tool_call_id": tid, "content": result})
 
     return content or ""
@@ -178,12 +243,15 @@ def _tool_result_summary(result_json: str, max_len: int = 280) -> str:
             if "entries" in data:
                 n = len(data.get("entries") or [])
                 return f"共 {n} 项"
+            if "results" in data:
+                r = data.get("results") or []
+                return "检索到 " + str(len(r)) + " 条知识库结果"
         return str(data)[:max_len]
     except Exception:
         return (result_json or "")[:max_len] + ("…" if len(str(result_json or "")) > max_len else "")
 
 
-def chat_completion_stream_with_tool_events(provider_id: str, model: str, messages: list, max_tool_rounds: int = 20, use_deep_thinking: bool = False):
+def chat_completion_stream_with_tool_events(provider_id: str, model: str, messages: list, max_tool_rounds: int = 50, use_deep_thinking: bool = False):
     """
     带 UTCP 工具的工作流流式调用：每轮中先 yield tool_call 事件，执行工具后 yield tool_result 事件，
     最后若无 tool_calls 则 yield content 事件（最终回复的逐块内容）。
@@ -226,6 +294,13 @@ def chat_completion_stream_with_tool_events(provider_id: str, model: str, messag
             return
 
         current_messages.append(msg)
+        shell_judge = make_shell_judge_callback(provider_id, model)
+        cfg = _get_config()
+        safe_mode = bool(cfg.get("safe_mode", False))
+        project_root = current_app.config.get("PROJECT_ROOT")
+        project_root = str(project_root) if project_root else None
+        uploads_dir = current_app.config.get("UPLOADS_DIR")
+        uploads_dir = str(uploads_dir) if uploads_dir else None
         for tc in tool_calls:
             tid = tc.get("id") or ""
             fn = tc.get("function") or {}
@@ -236,7 +311,11 @@ def chat_completion_stream_with_tool_events(provider_id: str, model: str, messag
                 args = {}
             args_preview = json.dumps(args, ensure_ascii=False)[:120]
             yield {"type": "tool_call", "tool_call_id": tid, "name": name, "arguments": args, "arguments_preview": args_preview}
-            result = execute_tool(name, args)
+            result = execute_tool(
+                name, args,
+                llm_judge_callback=shell_judge if name == "run_shell" else None,
+                safe_mode=safe_mode, project_root=project_root, uploads_dir=uploads_dir,
+            )
             summary = _tool_result_summary(result)
             yield {"type": "tool_result", "tool_call_id": tid, "name": name, "result_summary": summary, "result_full": result[:2000] if len(result) > 2000 else result}
             current_messages.append({"role": "tool", "tool_call_id": tid, "content": result})
@@ -244,13 +323,13 @@ def chat_completion_stream_with_tool_events(provider_id: str, model: str, messag
     yield {"type": "content", "content": ""}
 
 
-def chat_completion_stream(provider_id: str, model: str, messages: list, use_utcp_tools: bool = False, use_deep_thinking: bool = False):
+def chat_completion_stream(provider_id: str, model: str, messages: list, use_utcp_tools: bool = False, use_deep_thinking: bool = False, max_tool_rounds: int = 50):
     """
     流式调用。若 use_utcp_tools 为 True，yield 的为事件对象 {type, ...}（tool_call / tool_result / content），
     供前端展示步骤栏与最终内容；否则 yield 纯 content 字符串块。
     """
     if use_utcp_tools:
-        for ev in chat_completion_stream_with_tool_events(provider_id, model, messages, use_deep_thinking=use_deep_thinking):
+        for ev in chat_completion_stream_with_tool_events(provider_id, model, messages, max_tool_rounds=max_tool_rounds, use_deep_thinking=use_deep_thinking):
             yield ev
         return
     api_base, api_key = _get_provider_config(provider_id)

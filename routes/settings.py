@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """设置聚合页：左侧栏切换 API信息、全局配置、UTCP 控制台、关于我们。"""
+import shutil
 from pathlib import Path
 from flask import Blueprint, redirect, url_for, render_template, current_app, request, jsonify
 
@@ -36,17 +37,25 @@ def config():
 
 @settings_bp.route("/global")
 def global_config():
-    """全局配置：API 配置检测、UTCP 插件、AI 前置提示词"""
+    """全局配置：API 配置检测、UTCP 插件、自动化工作流、最大轮次、AI 前置提示词"""
     load = current_app.config["CONFIG_LOADER"]
     cfg = load()
     utcp_enabled = cfg.get("utcp_plugin_enabled", True)
+    utcp_tools_enabled = cfg.get("utcp_tools_enabled", True)
+    utcp_max_tool_rounds = int(cfg.get("utcp_max_tool_rounds", 50))
     system_prompt = cfg.get("system_prompt", "")
+    safe_mode = bool(cfg.get("safe_mode", False))
+    ai_default_language = cfg.get("ai_default_language") or "zh"
     from app import DEFAULT_SYSTEM_PROMPT
     return render_template(
         "settings_global.html",
         utcp_plugin_enabled=utcp_enabled,
+        utcp_tools_enabled=utcp_tools_enabled,
+        utcp_max_tool_rounds=utcp_max_tool_rounds,
         system_prompt=system_prompt,
         default_system_prompt=DEFAULT_SYSTEM_PROMPT,
+        safe_mode=safe_mode,
+        ai_default_language=ai_default_language,
     )
 
 
@@ -100,6 +109,68 @@ def global_utcp_toggle():
     return jsonify({"ok": True, "utcp_plugin_enabled": cfg["utcp_plugin_enabled"]})
 
 
+@settings_bp.route("/global/api/utcp-tools", methods=["GET", "POST"])
+def global_utcp_tools():
+    """GET 返回自动化工作流开关与最大轮次；POST 设置（body: {"utcp_tools_enabled": bool, "utcp_max_tool_rounds": int}）"""
+    load = current_app.config["CONFIG_LOADER"]
+    save = current_app.config["CONFIG_SAVER"]
+    if request.method == "GET":
+        cfg = load()
+        return jsonify({
+            "utcp_tools_enabled": cfg.get("utcp_tools_enabled", True),
+            "utcp_max_tool_rounds": int(cfg.get("utcp_max_tool_rounds", 50)),
+        })
+    data = request.get_json() or {}
+    cfg = load()
+    if "utcp_tools_enabled" in data:
+        cfg["utcp_tools_enabled"] = bool(data["utcp_tools_enabled"])
+    if "utcp_max_tool_rounds" in data:
+        try:
+            n = int(data["utcp_max_tool_rounds"])
+            cfg["utcp_max_tool_rounds"] = max(1, min(200, n))
+        except (TypeError, ValueError):
+            pass
+    save(cfg)
+    return jsonify({
+        "ok": True,
+        "utcp_tools_enabled": cfg.get("utcp_tools_enabled", True),
+        "utcp_max_tool_rounds": int(cfg.get("utcp_max_tool_rounds", 50)),
+    })
+
+
+@settings_bp.route("/global/api/safe-mode", methods=["GET", "POST"])
+def global_safe_mode():
+    """GET 返回安全模式；POST 设置（body: {"safe_mode": true/false}）"""
+    load = current_app.config["CONFIG_LOADER"]
+    save = current_app.config["CONFIG_SAVER"]
+    if request.method == "GET":
+        cfg = load()
+        return jsonify({"safe_mode": bool(cfg.get("safe_mode", False))})
+    data = request.get_json() or {}
+    cfg = load()
+    cfg["safe_mode"] = bool(data.get("safe_mode", False))
+    save(cfg)
+    return jsonify({"ok": True, "safe_mode": cfg["safe_mode"]})
+
+
+@settings_bp.route("/global/api/ai-default-language", methods=["GET", "POST"])
+def global_ai_default_language():
+    """GET 返回 AI 默认语言；POST 设置（body: {"ai_default_language": "zh"|"en"|"auto"}）"""
+    load = current_app.config["CONFIG_LOADER"]
+    save = current_app.config["CONFIG_SAVER"]
+    if request.method == "GET":
+        cfg = load()
+        return jsonify({"ai_default_language": cfg.get("ai_default_language") or "zh"})
+    data = request.get_json() or {}
+    val = (data.get("ai_default_language") or "zh").strip() or "zh"
+    if val not in ("zh", "en", "auto"):
+        val = "zh"
+    cfg = load()
+    cfg["ai_default_language"] = val
+    save(cfg)
+    return jsonify({"ok": True, "ai_default_language": cfg["ai_default_language"]})
+
+
 @settings_bp.route("/global/api/system-prompt", methods=["GET", "POST"])
 def global_system_prompt():
     """GET 返回当前 AI 前置提示词；POST 保存（body: {"system_prompt": "..."}）"""
@@ -118,6 +189,34 @@ def global_system_prompt():
     cfg["system_prompt"] = system_prompt
     save(cfg)
     return jsonify({"ok": True, "system_prompt": cfg["system_prompt"]})
+
+
+@settings_bp.route("/global/api/clear-uploads", methods=["POST"])
+def global_clear_uploads():
+    """清空 uploads 上传目录（手动清空）。"""
+    uploads_dir = Path(current_app.config["UPLOADS_DIR"])
+    try:
+        if uploads_dir.exists():
+            shutil.rmtree(uploads_dir)
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        return jsonify({"ok": True, "message": "已清空上传文件"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@settings_bp.route("/knowledge")
+def knowledge():
+    """知识库状态页：查看 knowledge 目录下的文件与块数"""
+    from services.knowledge_base import get_status
+    status = get_status()
+    return render_template("settings_knowledge.html", **status)
+
+
+@settings_bp.route("/knowledge/api/status")
+def knowledge_api_status():
+    """API：返回知识库状态（JSON）"""
+    from services.knowledge_base import get_status
+    return jsonify(get_status())
 
 
 @settings_bp.route("/utcp")

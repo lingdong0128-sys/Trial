@@ -14,5 +14,9 @@
     }
   ],
   "utcp_plugin_enabled": true,
-  "system_prompt": ""
+  "utcp_tools_enabled": true,
+  "utcp_max_tool_rounds": 200,
+  "system_prompt": "",
+  "safe_mode": false,
+  "ai_default_language": "zh"
 }

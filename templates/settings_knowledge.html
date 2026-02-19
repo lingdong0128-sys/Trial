@@ -1,0 +1,51 @@
+{% extends "settings_base.html" %}
+{% block title %}知识库 - Trial{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.kb-wrap { max-width: 640px; margin: 0; padding: 0; }
+.kb-wrap h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+.kb-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.kb-section h2 { font-size: 1rem; margin: 0 0 0.75rem 0; color: var(--text); }
+.kb-section .desc { color: var(--muted); font-size: 0.875rem; margin-bottom: 0.75rem; }
+.kb-stat { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.75rem; }
+.kb-stat-item { padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.9rem; }
+.kb-stat-item strong { color: var(--accent); }
+.kb-dir { font-family: monospace; font-size: 0.8rem; color: var(--muted); word-break: break-all; }
+.kb-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.kb-table th, .kb-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+.kb-table th { color: var(--muted); font-weight: 500; }
+.kb-table td:last-child { text-align: right; color: var(--muted); }
+.kb-empty { color: var(--muted); font-size: 0.875rem; padding: 0.75rem 0; }
+{% endblock %}
+{% block settings_content %}
+<div class="kb-wrap">
+    <h1>知识库</h1>
+    <section class="kb-section">
+        <h2>状态</h2>
+        <p class="desc">知识库用于对话中 AI 检索参考（如 CTF 题型、漏洞利用、工具用法）。仅支持 <code>knowledge</code> 目录下的 .md / .txt 文件，每次检索时实时扫描该目录。</p>
+        <div class="kb-stat">
+            <span class="kb-stat-item">目录：<span class="kb-dir">{{ dir }}</span></span>
+            <span class="kb-stat-item">文件数：<strong>{{ file_count }}</strong></span>
+            <span class="kb-stat-item">检索块数：<strong>{{ chunk_count }}</strong></span>
+        </div>
+        <p class="kb-dir">在项目根下创建 <code>knowledge</code> 目录，放入 .md 或 .txt 即可。子目录中的文件也会被收录。</p>
+    </section>
+    <section class="kb-section">
+        <h2>已收录文件</h2>
+        {% if files %}
+        <table class="kb-table">
+            <thead>
+                <tr><th>路径</th><th>块数</th></tr>
+            </thead>
+            <tbody>
+                {% for f in files %}
+                <tr><td>{{ f.path }}</td><td>{{ f.chunks }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="kb-empty">暂无文件。请向 <code>knowledge</code> 目录添加 .md 或 .txt 文件。</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

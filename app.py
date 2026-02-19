@@ -8,6 +8,7 @@ Trial Web 应用入口
 """
 import os
 import json
+import shutil
 from pathlib import Path
 
 # 从 .env 加载环境变量（含 HTTPS 等），默认启用 HTTPS
@@ -32,6 +33,7 @@ from routes import auth_bp, chat_bp, admin_bp, settings_bp, utcp_bp
 
 _ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = _ROOT / "config.json"
+UPLOADS_DIR = _ROOT / "uploads"
 TLS_DIR = _ROOT / "tls"
 TLS_CERT = TLS_DIR / "cert.pem"
 TLS_KEY = TLS_DIR / "key.pem"
@@ -111,15 +113,32 @@ def load_config():
         cfg = _migrate_legacy(cfg)
         if "system_prompt" not in cfg:
             cfg["system_prompt"] = ""
+        if "utcp_max_tool_rounds" not in cfg:
+            cfg["utcp_max_tool_rounds"] = 50
+        if "utcp_tools_enabled" not in cfg:
+            cfg["utcp_tools_enabled"] = True
+        if "safe_mode" not in cfg:
+            cfg["safe_mode"] = False
+        if "ai_default_language" not in cfg:
+            cfg["ai_default_language"] = "zh"
         return cfg
-    return {"providers": [dict(p) for p in DEFAULT_PROVIDERS], "system_prompt": ""}
+    return {
+        "providers": [dict(p) for p in DEFAULT_PROVIDERS],
+        "system_prompt": "",
+        "utcp_max_tool_rounds": 50,
+        "utcp_tools_enabled": True,
+        "safe_mode": False,
+        "ai_default_language": "zh",
+    }
 
 
-# 默认 AI 前置提示词（自动化工作流角色与能力说明，可在设置中修改）
+# 默认 AI 前置提示词（环境摘要 + 安全工程师情景与审题要求，可在设置中修改）
 DEFAULT_SYSTEM_PROMPT = (
-    "你是一个具备自动化能力的助手，运行在 Linux 服务器上。你可以使用工具执行 shell 命令、读写文件、列出目录、扫描网络等，"
-    "拥有与人类操作者相当的权限。请根据用户需求主动规划并执行多步操作（如先扫描再分析再总结），直到完成任务。"
-    "仅在需要澄清时向用户提问；完成操作后用简洁自然语言总结结果。"
+    "【环境】你运行在 Linux 服务器上，可使用工具执行 shell 命令、读写文件、列出目录、扫描网络等，"
+    "拥有与人类操作者相当的权限。\n"
+    "【角色与情景】你是一名安全工程师/攻防演练助手，面向 CTF、渗透测试、漏洞分析、安全加固等场景。"
+    "请先审题：仔细理解题目要求、关键信息与约束（如题目描述、附件、flag 格式等），再规划步骤、调用工具并作答，避免偏题或遗漏关键点。\n"
+    "根据用户需求主动规划并执行多步操作（如先信息收集再分析再总结），仅在需要澄清时向用户提问，完成操作后用简洁自然语言总结结果。"
 )
 
 
@@ -128,7 +147,11 @@ def save_config(cfg):
     to_save = {
         "providers": [],
         "utcp_plugin_enabled": cfg.get("utcp_plugin_enabled", True),
+        "utcp_tools_enabled": cfg.get("utcp_tools_enabled", True),
+        "utcp_max_tool_rounds": int(cfg.get("utcp_max_tool_rounds", 50)),
         "system_prompt": cfg.get("system_prompt", ""),
+        "safe_mode": bool(cfg.get("safe_mode", False)),
+        "ai_default_language": cfg.get("ai_default_language") or "zh",
     }
     for p in cfg.get("providers") or []:
         if isinstance(p, dict) and p.get("id") in {m["provider_id"] for m in FIXED_PROVIDER_MODELS}:
@@ -142,6 +165,16 @@ def save_config(cfg):
         json.dump(to_save, f, ensure_ascii=False, indent=2)
 
 
+def _ensure_uploads_dir_empty():
+    """上传目录：若存在则清空，然后确保目录存在（服务器每次重启后清空 uploads）。"""
+    if UPLOADS_DIR.exists():
+        try:
+            shutil.rmtree(UPLOADS_DIR)
+        except OSError:
+            pass
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.environ.get("SECRET_KEY", "trial-secret-key-change-in-production")
@@ -149,6 +182,9 @@ def create_app():
     app.config["CONFIG_SAVER"] = save_config
     app.config["FIXED_PROVIDER_MODELS"] = FIXED_PROVIDER_MODELS
     app.config["DEFAULT_SYSTEM_PROMPT"] = DEFAULT_SYSTEM_PROMPT
+    app.config["UPLOADS_DIR"] = UPLOADS_DIR
+    app.config["PROJECT_ROOT"] = _ROOT
+    _ensure_uploads_dir_empty()
     if os.environ.get("HTTPS", "").lower() in ("1", "true", "yes") or os.environ.get("SSL_CERT_FILE"):
         app.config["PREFERRED_URL_SCHEME"] = "https"
 

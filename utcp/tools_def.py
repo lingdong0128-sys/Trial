@@ -28,7 +28,7 @@ def get_openai_tools():
             "type": "function",
             "function": {
                 "name": "run_shell",
-                "description": "在服务器（Linux）上执行任意 shell 命令。可用于执行系统命令、脚本、查看进程、安装软件、编译、运行程序等。你拥有与人类操作者相当的权限，可完成用户要求的各类操作。执行前应想清楚命令是否安全、必要时分步执行。",
+                "description": "在服务器（Linux）上执行任意 shell 命令。可用于执行系统命令、脚本、查看进程、安装软件、编译、运行程序等。你拥有与人类操作者相当的权限。在对话中调用时，会每 1 分钟根据当前输出由 AI 判断是否卡住，若判定卡住则中止，总时长上限 5 分钟；若需更长运行时间可依赖后台或分步执行。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -38,7 +38,7 @@ def get_openai_tools():
                         },
                         "timeout_seconds": {
                             "type": "integer",
-                            "description": "可选。超时秒数，默认 60，最大 600。",
+                            "description": "可选。超时秒数，默认 1800（30 分钟），最大 14400（4 小时）。安装、编译等耗时操作请显式传入更大值（如 3600、7200）。",
                         },
                         "cwd": {
                             "type": "string",
@@ -120,6 +120,27 @@ def get_openai_tools():
                             "description": "可选。是否包含以 . 开头的隐藏文件/目录，默认 false。",
                         },
                     },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "search_knowledge",
+                "description": "从知识库中检索与查询相关的资料片段。知识库位于项目 knowledge 目录（.md/.txt），适用于 CTF、漏洞利用、工具用法等。仅在你认为需要查阅项目内知识库资料时选用，非必须。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "检索关键词或短语，例如：SQL 注入、SSTI、union select、git 泄漏、某工具名、某漏洞类型。",
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "可选。返回最多几条结果，默认 5。",
+                        },
+                    },
+                    "required": ["query"],
                 },
             },
         },
