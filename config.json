@@ -1,0 +1,22 @@
+{
+  "providers": [
+    {
+      "id": "bailian",
+      "name": "阿里云百炼",
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode",
+      "api_key": "123"
+    },
+    {
+      "id": "deepseek",
+      "name": "深度求索",
+      "api_base": "https://api.deepseek.com",
+      "api_key": "123"
+    }
+  ],
+  "utcp_plugin_enabled": true,
+  "utcp_tools_enabled": true,
+  "utcp_max_tool_rounds": 200,
+  "system_prompt": "",
+  "safe_mode": false,
+  "ai_default_language": "zh"
+}

@@ -1,0 +1,157 @@
+{% extends "settings_base.html" %}
+{% block title %}UTCP 控制台 - Trial{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.utcp-wrap { max-width: 820px; margin: 0; padding: 0; }
+.utcp-wrap h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.utcp-wrap .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+.utcp-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.utcp-card h2 { font-size: 1rem; margin: 0 0 0.5rem 0; color: var(--text); }
+.utcp-card .desc { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.75rem; }
+.utcp-card .bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.utcp-card .bar input { padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.875rem; width: 8rem; }
+.utcp-card .bar .btn-call { padding: 0.45rem 1rem; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; }
+.utcp-card .bar .btn-call:hover { background: #1d4ed8; }
+.utcp-card .out { background: #0f172a; color: #e2e8f0; padding: 0.75rem 1rem; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; max-height: 280px; overflow-y: auto; }
+.utcp-card .out.empty { color: var(--muted); }
+.utcp-card .out.err { color: #fca5a5; }
+.utcp-card .loading { color: #94a3b8; }
+.utcp-card .utcp-textarea { width: 100%; margin-top: 0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.875rem; font-family: inherit; resize: vertical; box-sizing: border-box; }
+.toolbar-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.875rem; color: var(--muted); cursor: pointer; }
+{% endblock %}
+{% block settings_content %}
+<div class="utcp-wrap">
+    <h1>UTCP 控制台</h1>
+    <p class="sub">调用 UTCP 接口并查看返回结果。所有请求均发往 <code>/api/utcp/...</code>。</p>
+
+    <div class="utcp-card">
+        <h2>健康检查 <code>GET /api/utcp/health</code></h2>
+        <p class="desc">检查 UTCP 服务是否可用。</p>
+        <div class="bar">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/health" data-method="GET">调用</button>
+        </div>
+        <pre class="out empty" data-target="health">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>日期时间 <code>GET/POST /api/utcp/datetime</code></h2>
+        <p class="desc">获取当前日期、时间、时区、星期、时间戳等。可选 timezone_hours（如 8 表示 UTC+8）。</p>
+        <div class="bar">
+            <input type="text" id="datetime-tz" placeholder="时区小时（可选，如 8）" value="8">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/datetime" data-method="GET" data-query-param="timezone_hours">调用 GET</button>
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/datetime" data-method="POST" data-body-param="timezone_hours">调用 POST</button>
+        </div>
+        <pre class="out empty" data-target="datetime">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>执行命令 <code>POST /api/utcp/shell</code></h2>
+        <p class="desc">在服务器（Linux）上执行 shell 命令。可填超时秒数、工作目录（可选）。</p>
+        <div class="bar">
+            <input type="text" name="command" placeholder="命令，如 echo hello 或 ls -la" style="width: 18rem;">
+            <input type="number" name="timeout_seconds" placeholder="超时(秒)" value="60" style="width: 6rem;">
+            <input type="text" name="cwd" placeholder="工作目录(可选)" style="width: 10rem;">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/shell" data-method="POST" data-body-from="form">调用</button>
+        </div>
+        <pre class="out empty" data-target="shell">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>读取文件 <code>GET/POST /api/utcp/read-file</code></h2>
+        <p class="desc">读取项目根下文件内容。参数 path（必填）, encoding、max_bytes（可选）。</p>
+        <div class="bar">
+            <input type="text" name="path" placeholder="文件路径，如 README.md" style="width: 14rem;">
+            <input type="text" name="encoding" placeholder="编码(可选)" value="utf-8" style="width: 6rem;">
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/read-file" data-method="POST" data-body-from="form">调用 POST</button>
+        </div>
+        <pre class="out empty" data-target="read-file">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>写入文件 <code>POST /api/utcp/write-file</code></h2>
+        <p class="desc">向项目根下文件写入内容。path、content 必填；append 为 true 时追加。</p>
+        <div class="bar">
+            <input type="text" name="path" placeholder="文件路径" style="width: 14rem;">
+            <label class="toolbar-check"><input type="checkbox" name="append" value="1"> 追加</label>
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/write-file" data-method="POST" data-body-from="form">调用</button>
+        </div>
+        <textarea name="content" placeholder="写入内容" class="utcp-textarea" rows="2"></textarea>
+        <pre class="out empty" data-target="write-file">点击「调用」查看响应</pre>
+    </div>
+
+    <div class="utcp-card">
+        <h2>列出目录 <code>GET/POST /api/utcp/list-dir</code></h2>
+        <p class="desc">列出目录下的文件和子目录。path 默认当前目录；可选 include_hidden。</p>
+        <div class="bar">
+            <input type="text" name="path" placeholder="目录路径，如 . 或 utcp" style="width: 14rem;">
+            <label class="toolbar-check"><input type="checkbox" name="include_hidden" value="1"> 含隐藏</label>
+            <button type="button" class="btn-call" data-endpoint="/api/utcp/list-dir" data-method="POST" data-body-from="form">调用 POST</button>
+        </div>
+        <pre class="out empty" data-target="list-dir">点击「调用」查看响应</pre>
+    </div>
+
+</div>
+<script>
+(function() {
+    function findCard(btn) {
+        var card = btn.closest('.utcp-card');
+        return card ? card.querySelector('.out[data-target]') : null;
+    }
+    function getParam(btn) {
+        var param = btn.getAttribute('data-query-param') || btn.getAttribute('data-body-param');
+        if (!param) return null;
+        var card = btn.closest('.utcp-card');
+        var input = card ? card.querySelector('input[id]') : null;
+        return input ? input.value.trim() : null;
+    }
+    function getBodyFromForm(card) {
+        var body = {};
+        var els = card.querySelectorAll('input[name], textarea[name], select[name]');
+        els.forEach(function(el) {
+            var name = el.getAttribute('name');
+            if (!name) return;
+            if (el.type === 'checkbox') body[name] = el.checked;
+            else body[name] = el.value;
+        });
+        return body;
+    }
+    function setOut(pre, text, isErr) {
+        pre.textContent = text || '';
+        pre.classList.remove('empty', 'err', 'loading');
+        if (!text) pre.classList.add('empty');
+        else if (isErr) pre.classList.add('err');
+    }
+    document.querySelectorAll('.utcp-card .btn-call').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var pre = findCard(btn);
+            if (!pre) return;
+            var endpoint = btn.getAttribute('data-endpoint');
+            var method = (btn.getAttribute('data-method') || 'GET').toUpperCase();
+            var param = btn.getAttribute('data-query-param') || btn.getAttribute('data-body-param');
+            var paramVal = param ? getParam(btn) : null;
+            var url = endpoint;
+            var options = { method: method, headers: {} };
+            var bodyFromForm = btn.getAttribute('data-body-from') === 'form';
+            var card = btn.closest('.utcp-card');
+            if (method === 'GET' && !bodyFromForm && param && paramVal !== null && paramVal !== '') {
+                url += (url.indexOf('?') >= 0 ? '&' : '?') + encodeURIComponent(param) + '=' + encodeURIComponent(paramVal);
+            }
+            if (method === 'POST') {
+                options.headers['Content-Type'] = 'application/json';
+                if (bodyFromForm && card) {
+                    options.body = JSON.stringify(getBodyFromForm(card));
+                } else {
+                    options.body = param ? JSON.stringify(paramVal !== null && paramVal !== '' ? { [param]: paramVal } : {}) : '{}';
+                }
+            }
+            setOut(pre, '请求中…', false);
+            pre.classList.add('loading');
+            fetch(url, options)
+                .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, status: r.status, json: j }; }); })
+                .then(function(x) { var text = JSON.stringify(x.json, null, 2); setOut(pre, text, !x.ok); })
+                .catch(function(e) { setOut(pre, '请求失败: ' + e.message, true); });
+        });
+    });
+})();
+</script>
+{% endblock %}

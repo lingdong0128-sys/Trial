@@ -1,0 +1,81 @@
+{% extends "settings_base.html" %}
+{% block title %}API信息 - Trial{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.admin-wrap { max-width: 680px; margin: 0; padding: 0; }
+.admin-wrap h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.admin-wrap .sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+.block { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.block-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.block-header .provider-title { font-size: 1rem; font-weight: 600; color: var(--text); }
+.block-header .model-badge { font-size: 0.8rem; color: var(--muted); background: var(--bg); padding: 0.25rem 0.5rem; border-radius: 6px; }
+.block label { display: block; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+.block input.full { width: 100%; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); margin-bottom: 0.5rem; }
+.block .api-doc { font-size: 0.8rem; margin-bottom: 0.75rem; }
+.block .api-doc a { color: var(--accent); }
+.save-btn { padding: 0.6rem 1.25rem; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+.save-btn:hover { background: var(--accent-hover); }
+.status { margin-top: 0.5rem; font-size: 0.875rem; color: var(--muted); }
+{% endblock %}
+{% block settings_content %}
+<div class="admin-wrap">
+    <h1>API 信息</h1>
+    <p class="sub">服务商与模型已固定，仅可配置 API 地址与 Key。API Key 留空则不修改已保存的值。</p>
+
+    <div id="providerBlocks">
+        {% for p in providers %}
+        <div class="block" data-provider-id="{{ p.provider_id }}">
+            <div class="block-header">
+                <span class="provider-title">{{ p.provider_name }}</span>
+                <span class="model-badge">{{ p.model }}</span>
+            </div>
+            {% if p.api_doc %}
+            <p class="api-doc">API 文档：<a href="{{ p.api_doc }}" target="_blank" rel="noopener">打开文档</a></p>
+            {% endif %}
+            <input type="hidden" class="provider-id" value="{{ p.provider_id }}" data-field="id">
+            <label>API Base URL</label>
+            <input type="text" class="full" data-field="api_base" value="{{ p.api_base or '' }}" placeholder="https://...">
+            <label>API Key</label>
+            <input type="password" class="full" data-field="api_key" value="{{ p.api_key or '' }}" placeholder="留空则不修改已保存的 Key">
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="margin-top: 1.25rem;">
+        <button class="save-btn" id="save">保存配置</button>
+        <div class="status" id="status"></div>
+    </div>
+</div>
+<script>
+(function() {
+    const statusEl = document.getElementById('status');
+    const container = document.getElementById('providerBlocks');
+
+    function collectProvider(block) {
+        const id = (block.querySelector('.provider-id') || {}).value || '';
+        const api_base = (block.querySelector('input[data-field="api_base"]') || {}).value || '';
+        const api_key = (block.querySelector('input[data-field="api_key"]') || {}).value || '';
+        return { id: id, api_base: api_base.trim(), api_key: api_key.trim() };
+    }
+
+    function collectAll() {
+        return Array.from(container.querySelectorAll('.block')).map(collectProvider);
+    }
+
+    document.getElementById('save').addEventListener('click', function() {
+        const providers = collectAll();
+        if (providers.length === 0) { statusEl.textContent = '无有效配置'; return; }
+        fetch('/admin/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providers: providers })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            statusEl.textContent = data.ok ? '已保存（配置已持久化）' : (data.error || '保存失败');
+        })
+        .catch(function() { statusEl.textContent = '请求失败'; });
+    });
+})();
+</script>
+{% endblock %}

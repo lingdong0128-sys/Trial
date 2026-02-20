@@ -1,0 +1,29 @@
+{% extends "settings_base.html" %}
+{% block title %}关于我们 - Trial{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+{% endblock %}
+{% block extra_css %}
+{{ super() }}
+.about-wrap { max-width: 720px; margin: 0; padding: 0; }
+.about-wrap h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+.about-content { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; font-size: 0.9rem; line-height: 1.6; }
+.about-content h2 { font-size: 1.05rem; margin: 1rem 0 0.5rem 0; }
+.about-content h2:first-child { margin-top: 0; }
+.about-content pre { background: var(--bg); padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+.about-content code { background: var(--bg); padding: 0.1em 0.3em; border-radius: 4px; }
+{% endblock %}
+{% block settings_content %}
+<div class="about-wrap">
+    <h1>关于我们</h1>
+    <div class="about-content" id="aboutContent"></div>
+</div>
+<script>
+(function() {
+    var raw = {{ markdown_content | tojson }};
+    var el = document.getElementById('aboutContent');
+    if (typeof marked !== 'undefined') { marked.setOptions({ breaks: true }); el.innerHTML = marked.parse(raw || '暂无内容。'); }
+    else { el.textContent = raw || '暂无内容。'; }
+})();
+</script>
+{% endblock %}
