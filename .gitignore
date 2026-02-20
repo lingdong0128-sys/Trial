@@ -1,2 +1,9 @@
 # 私钥与证书勿提交
 tls/*.pem
+
+# Python 编译缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
