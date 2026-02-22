@@ -37,13 +37,14 @@ pip install -r requirements.txt
 # VNC环境
 apt update
 apt install -y xvfb x11vnc websockify fluxbox tigervnc-standalone-server
-
+#mimproxy环境
+apt install mitmproxy
 # 运行
 python app.py
 ```
 
 访问：<http://127.0.0.1:5000>，使用 `root` / `itzx` 登录。
-
+代理：服务器:8888
 ## 接口说明
 
 | 说明           | 路径/方法        |

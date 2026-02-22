@@ -6,6 +6,7 @@ from pathlib import Path
 from . import datetime_tool
 from . import shell_tool
 from . import file_tool
+from . import traffic_tools
 from services import knowledge_base
 from services import browser_packets
 
@@ -118,6 +119,30 @@ def execute_tool(name: str, arguments: dict, llm_judge_callback=None, safe_mode:
             if not p:
                 return json.dumps({"success": False, "protocol": "UTCP", "message": "未找到该录包", "data": None}, ensure_ascii=False)
             return json.dumps({"success": True, "protocol": "UTCP", "message": "ok", "data": p}, ensure_ascii=False)
+
+        if name == "add_traffic_modification":
+            url_regex = args.get("url_regex") or ""
+            modification_type = args.get("modification_type") or ""
+            data = args.get("data") or {}
+            result = traffic_tools.add_traffic_modification(url_regex, modification_type, data)
+            return json.dumps({"success": result.get("success", False), "protocol": "UTCP", "message": result.get("message", ""), "data": result}, ensure_ascii=False)
+
+        if name == "clear_traffic_rules":
+            result = traffic_tools.clear_traffic_rules()
+            return json.dumps({"success": result.get("success", False), "protocol": "UTCP", "message": result.get("message", ""), "data": result}, ensure_ascii=False)
+
+        if name == "list_traffic_rules":
+            result = traffic_tools.list_traffic_rules()
+            return json.dumps({"success": result.get("success", False), "protocol": "UTCP", "message": result.get("message", ""), "data": result}, ensure_ascii=False)
+
+        if name == "replay_packet":
+            packet_id = (args.get("packet_id") or "").strip()
+            if not packet_id:
+                return json.dumps({"success": False, "protocol": "UTCP", "message": "缺少 packet_id", "data": None}, ensure_ascii=False)
+            result = traffic_tools.replay_packet(packet_id)
+            if "error" in result:
+                return json.dumps({"success": False, "protocol": "UTCP", "message": result.get("error", ""), "data": result}, ensure_ascii=False)
+            return json.dumps({"success": True, "protocol": "UTCP", "message": "重发成功", "data": result}, ensure_ascii=False)
 
         return json.dumps({"success": False, "error": f"未知工具: {name}"}, ensure_ascii=False)
     except Exception as e:

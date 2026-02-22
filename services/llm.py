@@ -7,6 +7,10 @@ import json
 import requests
 from flask import current_app
 
+# 禁用 SSL 验证警告（因为我们将忽略 SSL 验证）
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def _get_config():
     return current_app.config["CONFIG_LOADER"]()
@@ -41,7 +45,8 @@ def _openai_style_chat_sync(api_base: str, api_key: str, model: str, messages: l
     if extra_body:
         payload.update(extra_body)
     # 多轮工具调用时请求体与模型推理时间较长，超时设为 300 秒
-    r = requests.post(url, json=payload, headers=headers, timeout=300)
+    # 忽略 SSL 验证（应急方案，用于解决证书问题）
+    r = requests.post(url, json=payload, headers=headers, timeout=300, verify=False)
     r.raise_for_status()
     return r.json()
 
@@ -57,7 +62,8 @@ def _openai_style_chat_stream(api_base: str, api_key: str, model: str, messages:
     if extra_body:
         payload.update(extra_body)
     # 多轮工具调用时单次请求可能较久，超时设为 300 秒
-    r = requests.post(url, json=payload, headers=headers, timeout=300, stream=True)
+    # 忽略 SSL 验证（应急方案，用于解决证书问题）
+    r = requests.post(url, json=payload, headers=headers, timeout=300, stream=True, verify=False)
     r.raise_for_status()
     for line in r.iter_lines(decode_unicode=True):
         if not line or not line.strip():

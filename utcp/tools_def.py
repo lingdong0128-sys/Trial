@@ -198,4 +198,87 @@ def get_openai_tools():
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "add_traffic_modification",
+                "description": "添加网络流量修改规则。可以修改请求头、替换响应内容或阻断请求。当用户需要拦截、修改或阻断特定网站流量时使用此工具。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url_regex": {
+                            "type": "string",
+                            "description": "匹配 URL 的正则表达式，例如 'example.com/api' 或 'baidu.com'",
+                        },
+                        "modification_type": {
+                            "type": "string",
+                            "enum": ["modify_request_header", "modify_response_body", "block_request"],
+                            "description": "修改类型：modify_request_header（修改请求头）、modify_response_body（修改响应体）、block_request（阻断请求）",
+                        },
+                        "data": {
+                            "type": "object",
+                            "description": "修改的具体数据。修改请求头时需包含 'key' 和 'value'；修改响应体时需包含 'old_text' 和 'new_text'；阻断请求时可为空对象。",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "description": "请求头的键名（仅在修改请求头时使用）"
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "description": "请求头的值（仅在修改请求头时使用）"
+                                },
+                                "old_text": {
+                                    "type": "string",
+                                    "description": "要替换的原始文本（仅在修改响应体时使用）"
+                                },
+                                "new_text": {
+                                    "type": "string",
+                                    "description": "替换后的新文本（仅在修改响应体时使用）"
+                                }
+                            }
+                        },
+                    },
+                    "required": ["url_regex", "modification_type", "data"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "clear_traffic_rules",
+                "description": "清除所有流量拦截规则。当需要重置流量拦截状态时使用。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_traffic_rules",
+                "description": "列出所有当前的流量拦截规则。用于查看已设置的拦截规则。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "replay_packet",
+                "description": "重发已录制的网络请求（根据 packet_id）。用于测试 API 接口或复现 Bug。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "packet_id": {
+                            "type": "string",
+                            "description": "要重发的录包 ID"
+                        }
+                    },
+                    "required": ["packet_id"]
+                }
+            },
+        },
     ]

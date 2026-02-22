@@ -28,6 +28,12 @@ if not os.environ.get("HTTPS") and not os.environ.get("SSL_CERT_FILE"):
 
 from flask import Flask, redirect, url_for, send_from_directory
 from flask import request, session
+import logging
+
+# 禁用 mitmproxy 的日志，避免与 Flask 的 Werkzeug 日志冲突
+logging.getLogger("mitmproxy").setLevel(logging.CRITICAL)
+logging.getLogger("mitmproxy.proxy").setLevel(logging.CRITICAL)
+logging.getLogger("mitmproxy.server").setLevel(logging.CRITICAL)
 
 from routes import auth_bp, chat_bp, admin_bp, settings_bp, utcp_bp
 from routes.browser import browser_bp
@@ -64,6 +70,22 @@ FIXED_PROVIDER_MODELS = [
         "api_doc": "https://api-docs.deepseek.com/zh-cn/api/create-chat-completion",
         "support_function_calling": True,
         "support_deep_thinking": True,
+    },
+    {
+        "provider_id": "siliconflow",
+        "provider_name": "硅基流动",
+        "model": "Pro/deepseek-ai/DeepSeek-V3.2",
+        "api_doc": "https://docs.siliconflow.cn/docs/deepseek-ai-deepseek-v3",
+        "support_function_calling": True,
+        "support_deep_thinking": True,
+    },
+    {
+        "provider_id": "siliconflow",
+        "provider_name": "硅基流动",
+        "model": "Qwen/Qwen2.5-7B-Instruct",
+        "api_doc": "https://docs.siliconflow.cn/docs/qwen-qwen2.5-7b-instruct",
+        "support_function_calling": True,
+        "support_deep_thinking": False,
     },
 ]
 

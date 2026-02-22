@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Iframe Access</title>
+</head>
+<body>
+    <iframe id="targetFrame" src="http://127.0.0.1:81/" width="800" height="600"></iframe>
+    <div id="result"></div>
+    <script>
+        document.getElementById('targetFrame').onload = function() {
+            try {
+                const iframe = document.getElementById('targetFrame');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const content = iframeDoc.body.innerHTML;
+                document.getElementById('result').innerHTML = '<h3>Iframe Content:</h3><pre>' + 
+                    escapeHtml(content.substring(0, 2000)) + '</pre>';
+                
+                // Also check for flag patterns
+                const text = iframeDoc.body.innerText || iframeDoc.body.textContent;
+                const flagPattern = /flag\{[^}]+\}/gi;
+                const matches = text.match(flagPattern);
+                if (matches) {
+                    document.getElementById('result').innerHTML += '<h3>Flags found:</h3><ul>';
+                    matches.forEach(match => {
+                        document.getElementById('result').innerHTML += '<li>' + escapeHtml(match) + '</li>';
+                    });
+                    document.getElementById('result').innerHTML += '</ul>';
+                }
+            } catch (e) {
+                document.getElementById('result').innerHTML = 'Error accessing iframe: ' + e.message + 
+                    '<br>This is likely due to same-origin policy.';
+            }
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

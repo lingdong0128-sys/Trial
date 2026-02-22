@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """记录器：录制代理端口展示、录包列表与详情。无内置浏览器，需在本地浏览器中配置代理后使用。"""
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, send_file
 
 from services import browser_packets
 from services import browser_session
@@ -56,3 +56,24 @@ def packet_detail(packet_id):
     if not p:
         return jsonify({"error": "未找到"}), 404
     return jsonify(p)
+
+
+@browser_bp.route("api/recorder/cert", methods=["GET"])
+def download_cert():
+    """
+    下载 Mitmproxy CA 证书
+    用于解密 HTTPS 流量，用户需要将此证书安装到浏览器/系统中并设置为"始终信任"
+    """
+    cert_path = browser_session.get_mitmproxy_cert_path()
+    if not cert_path:
+        return jsonify({"error": "证书文件未找到。请先启动代理以生成证书。"}), 404
+    
+    try:
+        return send_file(
+            cert_path, 
+            as_attachment=True, 
+            download_name="mitmproxy-ca-cert.pem",
+            mimetype="application/x-pem-file"
+        )
+    except Exception as e:
+        return jsonify({"error": f"证书下载失败: {str(e)}"}), 500

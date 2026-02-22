@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><title>JS Fetch Test</title></head>
+<body>
+<script>
+// First, attempt to fetch from the same origin
+fetch('/')
+  .then(r => r.text())
+  .then(text => {
+    document.body.innerHTML = '<h1>Current page:</h1><pre>' + escapeHtml(text.substring(0,1000)) + '</pre>';
+  })
+  .catch(e => {
+    document.body.innerHTML = 'Error fetching /: ' + e.message;
+  });
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

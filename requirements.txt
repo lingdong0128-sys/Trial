@@ -3,3 +3,4 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 playwright>=1.40.0
 flask-sock>=0.7.0
+mitmproxy>=10.0.0
